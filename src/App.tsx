@@ -44,9 +44,9 @@ function Reveal({ children, className = '', delay = 0 }: { children: ReactNode; 
   )
 }
 
-function Brand({ href = '#home' }: { href?: string }) {
+function Brand({ href = '#home', onClick }: { href?: string; onClick?: (e: React.MouseEvent) => void }) {
   return (
-    <a className="brand" href={href} aria-label="Tapit home">
+    <a className="brand" href={href} onClick={onClick} aria-label="Tapit home">
       <span className="brand-mark"><Hexagon size={23} strokeWidth={2.4} /><span /></span>
       <span>tapit</span>
     </a>
@@ -529,7 +529,7 @@ function FAQ() {
   )
 }
 
-function Footer() {
+function Footer({ onNavigatePrivacy }: { onNavigatePrivacy: (e?: React.MouseEvent) => void }) {
   return (
     <footer id="footer" className="site-footer">
       <div className="page-container">
@@ -539,7 +539,7 @@ function Footer() {
         <div className="footer-main">
           <div className="footer-brand-column"><Brand /><p>Your professional identity, one tap away.</p></div>
           <div className="footer-links-column"><strong>Explore</strong><a href="#features">Features</a><a href="#app-tour">App tour</a><a href="#plans">Plans</a></div>
-          <div className="footer-links-column"><strong>Help</strong><a href="#faq">FAQs</a><a href="/privacy-policy">Privacy policy</a></div>
+          <div className="footer-links-column"><strong>Help</strong><a href="#faq">FAQs</a><a href="/privacy-policy" onClick={onNavigatePrivacy}>Privacy policy</a></div>
         </div>
         <div className="footer-bottom" id="legal-details"><span>© {new Date().getFullYear()} Tapit. All rights reserved.</span><a href="#home">Back to top ↑</a></div>
       </div>
@@ -547,11 +547,25 @@ function Footer() {
   )
 }
 
-function PrivacyPolicy() {
+function isPrivacyRoute(): boolean {
+  if (typeof window === 'undefined') return false
+  const path = window.location.pathname.replace(/\/+$/, '').toLowerCase()
+  const hash = window.location.hash.toLowerCase()
+  return (
+    path === '/privacy-policy' ||
+    path.endsWith('/privacy-policy') ||
+    hash === '#privacy-policy' ||
+    hash === '#/privacy-policy' ||
+    hash.startsWith('#/privacy-policy')
+  )
+}
+
+function PrivacyPolicy({ onNavigateHome }: { onNavigateHome: (e?: React.MouseEvent) => void }) {
   const shouldReduceMotion = useReducedMotion()
 
   useEffect(() => {
     document.title = 'Privacy Policy | Tapit'
+    window.scrollTo({ top: 0, behavior: 'instant' })
 
     if (shouldReduceMotion) return
 
@@ -583,8 +597,18 @@ function PrivacyPolicy() {
     })
 
     return () => {
-      heroAnimation.cancel()
-      sectionAnimations.forEach((animation) => animation.cancel())
+      try {
+        if (heroAnimation && typeof heroAnimation.cancel === 'function') {
+          heroAnimation.cancel()
+        }
+        sectionAnimations.forEach((animation) => {
+          if (animation && typeof animation.cancel === 'function') {
+            animation.cancel()
+          }
+        })
+      } catch {
+        // Safe animation cleanup
+      }
       observer.disconnect()
     }
   }, [shouldReduceMotion])
@@ -593,8 +617,8 @@ function PrivacyPolicy() {
     <main className="privacy-page">
       <header className="privacy-header">
         <div className="privacy-header-inner">
-          <Brand href="/#home" />
-          <a className="privacy-back-link" href="/#home"><ArrowUpRight size={16} /> Back to Tapit</a>
+          <Brand href="/#home" onClick={onNavigateHome} />
+          <a className="privacy-back-link" href="/#home" onClick={onNavigateHome}><ArrowUpRight size={16} /> Back to Tapit</a>
         </div>
       </header>
       <div className="privacy-hero">
@@ -693,20 +717,66 @@ function PrivacyPolicy() {
           <div className="privacy-return-card">
             <span className="privacy-return-icon"><Globe2 size={19} /></span>
             <span><strong>That’s the full picture.</strong><small>Thanks for taking the time to understand how this website works.</small></span>
-            <a className="privacy-home-link" href="/#home">Back to Tapit <ArrowUpRight size={16} /></a>
+            <a className="privacy-home-link" href="/#home" onClick={onNavigateHome}>Back to Tapit <ArrowUpRight size={16} /></a>
           </div>
         </article>
       </motion.div>
       <footer className="privacy-footer">
-        <div className="privacy-container"><span>© {new Date().getFullYear()} Tapit</span><a href="/#home">Back to website ↑</a></div>
+        <div className="privacy-container"><span>© {new Date().getFullYear()} Tapit</span><a href="/#home" onClick={onNavigateHome}>Back to website ↑</a></div>
       </footer>
     </main>
   )
 }
 
 export default function App() {
-  if (window.location.pathname.replace(/\/+$/, '') === '/privacy-policy') {
-    return <PrivacyPolicy />
+  const [currentRoute, setCurrentRoute] = useState<'home' | 'privacy'>(() =>
+    isPrivacyRoute() ? 'privacy' : 'home'
+  )
+
+  useEffect(() => {
+    const handleLocationChange = () => {
+      const nextRoute = isPrivacyRoute() ? 'privacy' : 'home'
+      setCurrentRoute(nextRoute)
+      if (nextRoute === 'home') {
+        document.title = 'Tapit — Your Connections. One Tap Away.'
+      }
+    }
+
+    window.addEventListener('popstate', handleLocationChange)
+    window.addEventListener('hashchange', handleLocationChange)
+    return () => {
+      window.removeEventListener('popstate', handleLocationChange)
+      window.removeEventListener('hashchange', handleLocationChange)
+    }
+  }, [])
+
+  const navigateToPrivacy = (e?: React.MouseEvent) => {
+    if (e) {
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) {
+        return
+      }
+      e.preventDefault()
+    }
+    window.history.pushState({}, '', '/privacy-policy')
+    setCurrentRoute('privacy')
+    window.scrollTo({ top: 0, behavior: 'instant' })
+  }
+
+  const navigateToHome = (e?: React.MouseEvent) => {
+    if (e) {
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) {
+        return
+      }
+      e.preventDefault()
+    }
+    window.history.pushState({}, '', '/')
+    setCurrentRoute('home')
+    document.title = 'Tapit — Your Connections. One Tap Away.'
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  if (currentRoute === 'privacy') {
+    return <PrivacyPolicy onNavigateHome={navigateToHome} />
   }
 
   return (
@@ -718,7 +788,7 @@ export default function App() {
       <HowItWorks />
       <Plans />
       <FAQ />
-      <Footer />
+      <Footer onNavigatePrivacy={navigateToPrivacy} />
     </main>
   )
 }
